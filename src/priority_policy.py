@@ -4,10 +4,11 @@ import math
 import matplotlib.pyplot as plt
 import os
 from render import Demo
+import datetime
 
 #####################  hyper parameters  ####################
 LOCATION = "KAIST"
-USER_NUM = 10
+USER_NUM = 20
 EDGE_NUM = 10
 LIMIT = 4
 LEARNING_MAX_EPISODE = 20
@@ -82,7 +83,7 @@ def get_minimum():
     for data_num in range(TXT_NUM):
         data_name = str("%03d" % (data_num + 1))  # plus zero
         file_name = LOCATION + "_30sec_" + data_name + ".txt"
-        file_path = LOCATION + "/" + file_name
+        file_path = "../data/" + LOCATION + "/" + file_name
         f = open(file_path, "r")
         f1 = f.readlines()
         # get line_num
@@ -114,7 +115,7 @@ def proper_edge_loc(edge_num):
         for data_num in range(base, base + group_num):
             data_name = str("%03d" % (data_num + 1))  # plus zero
             file_name = LOCATION + "_30sec_" + data_name + ".txt"
-            file_path = LOCATION + "/" + file_name
+            file_path = "../data/" + LOCATION + "/" + file_name
             f = open(file_path, "r")
             f1 = f.readlines()
             # get line_num and initial data
@@ -147,7 +148,7 @@ class UE():
         # calculate num_step and define self.mob
         data_num = str("%03d" % (data_num + 1))  # plus zero
         file_name = LOCATION + "_30sec_" + data_num + ".txt"
-        file_path = LOCATION + "/" + file_name
+        file_path = "../data/" + LOCATION + "/" + file_name
         f = open(file_path, "r")
         f1 = f.readlines()
         data = 0
@@ -613,3 +614,4 @@ if __name__ == "__main__":
     f.write("the standard deviation of the rewards:" + str(np.std(ep_reward)) + '\n\n')
     print("the range of the rewards:", str(max(ep_reward) - min(ep_reward)))
     f.write("the range of the rewards:" + str(max(ep_reward) - min(ep_reward)) + '\n\n')
+    f.write("current time:" + str(datetime.datetime.now()))

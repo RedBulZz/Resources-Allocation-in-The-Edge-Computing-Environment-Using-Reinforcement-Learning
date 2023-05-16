@@ -3,16 +3,18 @@ from DDPG import DDPG
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import time
+import datetime
+
+
 
 #####################  hyper parameters  ####################
 CHECK_EPISODE = 4
-LEARNING_MAX_EPISODE = 10
-MAX_EP_STEPS = 3000
-TEXT_RENDER = False
-SCREEN_RENDER = True
+LEARNING_MAX_EPISODE = 100
+MAX_EP_STEPS = 3000  # 每一回合的最大步骤
+TEXT_RENDER = False  # 文本界面启用/禁用
+SCREEN_RENDER = True  # 图形界面启用/禁用
 CHANGE = False
-SLEEP_TIME = 0.1
+# SLEEP_TIME = 0.1  # 延迟时间
 
 #####################  function  ####################
 def exploration (a, r_dim, b_dim, r_var, b_var):
@@ -28,28 +30,31 @@ def exploration (a, r_dim, b_dim, r_var, b_var):
 ###############################  training  ####################################
 
 if __name__ == "__main__":
+    print(datetime.datetime.now())
     env = Env()
     s_dim, r_dim, b_dim, o_dim, r_bound, b_bound, task_inf, limit, location = env.get_inf()
+    # r_bound:ES最大资源(性能)1e9 * 0.063，b_boundL:ES之间最大带宽1e9
     ddpg = DDPG(s_dim, r_dim, b_dim, o_dim, r_bound, b_bound)
 
     r_var = 1  # control exploration
     b_var = 1
-    ep_reward = []
+    episode_reward = []  # 记录每个回合的总奖励
     r_v, b_v = [], []
     var_reward = []
     max_rewards = 0
-    episode = 0
-    var_counter = 0
-    epoch_inf = []
+    episode = 0  # 记录回合数（不会重置）
+    var_counter = 0  # 回合数（用于循环，可能重置）
+    epoch_inf = []  # 记录每一回合的打印信息
     while var_counter < LEARNING_MAX_EPISODE:
         # initialize
         s = env.reset()
-        ep_reward.append(0)
+        episode_reward.append(0)  # 初始化 让每一回合的奖励能够累加
+
         if SCREEN_RENDER:
             env.initial_screen_demo()
 
-        for j in range(MAX_EP_STEPS):
-            time.sleep(SLEEP_TIME)
+        for j in range(MAX_EP_STEPS):  # 1回合3000步，也就是3000次向前传播，每个用户移动100次
+            # time.sleep(SLEEP_TIME)
             # render
             if SCREEN_RENDER:
                 env.screen_demo()
@@ -57,15 +62,15 @@ if __name__ == "__main__":
                 env.text_render()
 
             # DDPG
-            # choose action according to state
+            # a 中的 offloading 部分是每个用户卸载到每个ES上的概率
             a = ddpg.choose_action(s)  # a = [R B O]
-            # add randomness to action selection for exploration
+            # 对得到的动作进行处理（增加随机性）
             a = exploration(a, r_dim, b_dim, r_var, b_var)
-            # store the transition parameter
+            # 向前传播
             s_, r = env.ddpg_step_forward(a, r_dim, b_dim)
             ddpg.store_transition(s, a, r / 10, s_)
             # learn
-            if ddpg.pointer == ddpg.memory_capacity:
+            if ddpg.pointer == ddpg.memory_capacity:  # 如果存储的经验组达到并超过memory_capacity即10000条 就开始学习
                 print("start learning")
             if ddpg.pointer > ddpg.memory_capacity:
                 ddpg.learn()
@@ -74,20 +79,20 @@ if __name__ == "__main__":
                     b_var *= .99999
             # replace the state
             s = s_
-            # sum up the reward
-            ep_reward[episode] += r
-            # in the end of the episode
+            # 累加这一回合每一步得到的奖励
+            episode_reward[episode] += r
+            # 如果此回合达到最大步数：
             if j == MAX_EP_STEPS - 1:
-                var_reward.append(ep_reward[episode])
+                var_reward.append(episode_reward[episode])
                 r_v.append(r_var)
                 b_v.append(b_var)
-                print('Episode:%3d' % episode, ' Reward: %5d' % ep_reward[episode], '###  r_var: %.2f ' % r_var,'b_var: %.2f ' % b_var, )
-                string = 'Episode:%3d' % episode + ' Reward: %5d' % ep_reward[episode] + '###  r_var: %.2f ' % r_var + 'b_var: %.2f ' % b_var
+                print('Episode:%3d' % episode, ' Reward: %5d' % episode_reward[episode], '###  r_var: %.2f ' % r_var,'b_var: %.2f ' % b_var, )
+                string = 'Episode:%3d' % episode + ' Reward: %5d' % episode_reward[episode] + ' ###  r_var: %.2f ' % r_var + 'b_var: %.2f ' % b_var
                 epoch_inf.append(string)
-                # variation change
+                # 如果到了第5回合后(var_counter为4后)并且后面四个回合的奖励的平均值大于等于最大奖励时：
                 if var_counter >= CHECK_EPISODE and np.mean(var_reward[-CHECK_EPISODE:]) >= max_rewards:
                     CHANGE = True
-                    var_counter = 0
+                    var_counter = 0  # 回合置为0  从0回合重新开始开始
                     max_rewards = np.mean(var_reward[-CHECK_EPISODE:])
                     var_reward = []
                 else:
@@ -104,18 +109,21 @@ if __name__ == "__main__":
     if (os.path.isdir(dir_name)):
         os.rmdir(dir_name)
     os.makedirs(dir_name)
+
     # plot the reward
     fig_reward = plt.figure()
-    plt.plot([i+1 for i in range(episode)], ep_reward)
+    plt.plot([i+1 for i in range(episode)], episode_reward)
     plt.xlabel("episode")
     plt.ylabel("rewards")
     fig_reward.savefig(dir_name + '/rewards.png')
+
     # plot the variance
     fig_variance = plt.figure()
     plt.plot([i + 1 for i in range(episode)], r_v, b_v)
     plt.xlabel("episode")
     plt.ylabel("variance")
     fig_variance.savefig(dir_name + '/variance.png')
+
     # write the record
     f = open(dir_name + '/record.txt', 'a')
     f.write('time(s):' + str(MAX_EP_STEPS) + '\n\n')
@@ -127,13 +135,14 @@ if __name__ == "__main__":
     for i in range(episode):
         f.write(epoch_inf[i] + '\n')
     # mean
-    print("the mean of the rewards in the last", LEARNING_MAX_EPISODE, " epochs:", str(np.mean(ep_reward[-LEARNING_MAX_EPISODE:])))
-    f.write("the mean of the rewards:" + str(np.mean(ep_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
+    print("the mean of the rewards in the last", LEARNING_MAX_EPISODE, " epochs:", str(np.mean(episode_reward[-LEARNING_MAX_EPISODE:])))
+    f.write("the mean of the rewards:" + str(np.mean(episode_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
     # standard deviation
-    print("the standard deviation of the rewards:", str(np.std(ep_reward[-LEARNING_MAX_EPISODE:])))
-    f.write("the standard deviation of the rewards:" + str(np.std(ep_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
+    print("the standard deviation of the rewards:", str(np.std(episode_reward[-LEARNING_MAX_EPISODE:])))
+    f.write("the standard deviation of the rewards:" + str(np.std(episode_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
     # range
-    print("the range of the rewards:", str(max(ep_reward[-LEARNING_MAX_EPISODE:]) - min(ep_reward[-LEARNING_MAX_EPISODE:])))
-    f.write("the range of the rewards:" + str(max(ep_reward[-LEARNING_MAX_EPISODE:]) - min(ep_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
+    print("the range of the rewards:", str(max(episode_reward[-LEARNING_MAX_EPISODE:]) - min(episode_reward[-LEARNING_MAX_EPISODE:])))
+    f.write("the range of the rewards:" + str(max(episode_reward[-LEARNING_MAX_EPISODE:]) - min(episode_reward[-LEARNING_MAX_EPISODE:])) + '\n\n')
+    f.write("current time:" + str(datetime.datetime.now()))
     f.close()
 

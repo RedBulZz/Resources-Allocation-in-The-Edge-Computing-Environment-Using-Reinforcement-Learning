@@ -5,13 +5,14 @@ import time
 import matplotlib.pyplot as plt
 import os
 from render import Demo
+import datetime
 
 #####################  hyper parameters  ####################
 LOCATION = "KAIST"
-USER_NUM = 10
+USER_NUM = 20
 EDGE_NUM = 10
 LIMIT = 4
-LEARNING_MAX_EPISODE = 10
+LEARNING_MAX_EPISODE = 45
 MAX_EP_STEPS = 3000
 TXT_NUM = 92
 TEXT_RENDER = False
@@ -74,7 +75,7 @@ def proper_edge_loc(edge_num):
         for data_num in range(base, base + group_num):
             data_name = str("%03d" % (data_num + 1))  # plus zero
             file_name = LOCATION + "_30sec_" + data_name + ".txt"
-            file_path = LOCATION + "/" + file_name
+            file_path = "../data/" + LOCATION + "/" + file_name
             f = open(file_path, "r")
             f1 = f.readlines()
             # get line_num and initial data
@@ -107,7 +108,7 @@ class UE():
         # calculate num_step and define self.mob
         data_num = str("%03d" % (data_num + 1))  # plus zero
         file_name = LOCATION + "_30sec_" + data_num + ".txt"
-        file_path = LOCATION + "/" + file_name
+        file_path = "../data/" + LOCATION + "/" + file_name
         f = open(file_path, "r")
         f1 = f.readlines()
         data = 0
@@ -205,7 +206,7 @@ class TaskType():
 class EdgeServer():
     def __init__(self, edge_id, loc):
         self.edge_id = edge_id  # edge server number
-        self.loc = loc
+        self.loc = loc  # ES的坐标位置
         self.capability = 1e9 * 0.063
         self.user_group = []
         self.limit = LIMIT
@@ -311,11 +312,11 @@ class close_policy():
             dist = np.zeros(EDGE_NUM)
             priority = np.zeros(EDGE_NUM)
             for edge in E:
-                dist[edge.edge_id] = np.sqrt(np.sum(np.square(user.loc[0] - edge.loc)))
+                dist[edge.edge_id] = np.sqrt(np.sum(np.square(user.loc[0] - edge.loc)))  # 此用户和每个ES之间的直线距离
             dist_sort = np.sort(dist)
             for index in range(EDGE_NUM):
-                priority[index] = np.argwhere(dist == dist_sort[index])[0]
-            O[user.user_id] = priority[0]
+                priority[index] = np.argwhere(dist == dist_sort[index])[0]  # 按照距离得到优先级列表
+            O[user.user_id] = priority[0]  # 此用户选择最近的ES进行卸载
         return O
 
     def resource_update(self, R, E ,U):
@@ -569,3 +570,4 @@ if __name__ == "__main__":
     f.write("the standard deviation of the rewards:" + str(np.std(ep_reward)) + '\n\n')
     print("the range of the rewards:", str(max(ep_reward)-min(ep_reward)))
     f.write("the range of the rewards:" + str(max(ep_reward)-min(ep_reward)) + '\n\n')
+    f.write("current time:" + str(datetime.datetime.now()))
